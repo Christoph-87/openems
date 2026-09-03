@@ -27,6 +27,11 @@ export class GridSectionComponent extends AbstractSection implements OnInit, OnD
     protected buyAnimationClass: string = "grid-buy-hide";
     protected gridBuyPrice: SubValueProperties | null = null;
 
+    // Tracks whether the image-position offset for the price row has been applied.
+    // setElementHeight() runs before gridBuyPrice is known (async config fetch),
+    // so the offset must be applied lazily when the price first appears/disappears.
+    private priceOffsetApplied: boolean = false;
+
     private subShow?: Subscription;
 
     constructor(
@@ -151,6 +156,15 @@ export class GridSectionComponent extends AbstractSection implements OnInit, OnD
         this.gridBuyPrice = this.calculateSubValueProperties(value);
 
         if (this.square) {
+            // setElementHeight() runs at init before gridBuyPrice is known, so the
+            // image-y offset must be applied here when price availability changes.
+            const hasBuyPrice = this.gridBuyPrice !== null;
+            if (hasBuyPrice !== this.priceOffsetApplied) {
+                this.square.image.y += hasBuyPrice ? 20 : -20;
+                this.squarePosition = this.getSquarePosition(this.square, this.innerRadius);
+                this.priceOffsetApplied = hasBuyPrice;
+            }
+
             // Set Grid-Mode
             this.square.image.image = this.getImagePath();
         }
@@ -206,11 +220,10 @@ export class GridSectionComponent extends AbstractSection implements OnInit, OnD
 
     protected setElementHeight() {
         this.square.valueText.y = this.square.valueText.y - this.square.valueText.y * 0.3;
-        this.square.image.y =
-            this.square.image.y -
-            this.square.image.y * 0.3 +
-            // Move down for grid-buy-price
-            (this.gridBuyPrice !== null ? 12 : 0);
+        this.square.image.y = this.square.image.y - this.square.image.y * 0.3;
+        // Note: the additional image-y offset for the price row is applied lazily
+        // in _updateCurrentData() via priceOffsetApplied, because gridBuyPrice is
+        // set asynchronously and is always null at this point.
     }
 
     protected getSvgEnergyFlow(ratio: number, radius: number): SvgEnergyFlow {
